@@ -1,0 +1,103 @@
+pytorch框架練習:這是簡易版的框架運作流程練習，大概知道每一句程式語法原理，但是不是每個都知道，先抓流程完整一次做出成品，後面再來深入理解每個語法運作原理，分三階段:
+1.(一階段)collecting data，抓台積電股票當練習data，這一階段做data collecting、data cleaning、 transform成pytorch可接受資料類型(tensor)，這個地方要注意tensor 接受的資料型態是[[]]，有點麻煩
+2.(二階段)model building，這裡是之後可以再深入理解語法原理的地方，用linear regression 只建一層而已，還談不上深度學習，但就是練習pytorch框架，後面learning rate、 learning iteration、loss function、optimizer function 全部修改過，才測試出數值比較接近的model 還有設定梯度裁剪，這幾個觀念分別精確指什麼其實還不識很清楚，下次再把它搞清楚一點。
+3.(三階段)測試，測試就是測試，測試完再去yahoo查台積電的真實股價，有落差XD 但是覺得可以接受^^，這次作業算做完了\^O^/，這次撰寫要注意的，常常會變數跟function重覆到，造成程式出錯，呵呵下次來取個更有意義的變數名。
+
+! pip install yahooquery
+
+import pandas as pd
+import numpy as np
+import yahooquery as yq
+
+def data_collecting(stock):
+  tsm = yq.Ticker(stock)
+
+  raw_data = tsm.history(period="3y")
+
+  price = raw_data.close
+
+  #print(price)
+
+  raw_x = []
+  raw_y = []
+  test_x = []
+  test_y = []
+
+  for i in range(0, len(price)-35):
+    x = price[i:i+30]
+    raw_x.append(x)
+    y = price[i+31:i+35].mean()
+    raw_y.append(y)
+    #print(x, y)
+
+  train_x = np.array(raw_x[:690])
+  train_y = np.array(raw_y[:690])
+
+  test_x = np.array(raw_x[691:])
+  test_y = np.array(raw_y[691:])
+
+  #print(train_y)
+
+  ly_1 = []
+  for a in train_y:
+    ly_1.append([a])
+
+  print(ly_1)
+
+  ly_2 = []
+  for b in test_y:
+    ly_2.append([b])
+
+
+  train_y = torch.tensor(ly_1, dtype=torch.float32)
+  test_y = torch.tensor(ly_2, dtype=torch.float32)
+
+  print(train_y.shape)
+
+  #print(train_x.shape)
+  #print(train_y.shape)
+
+  #train_x = torch.tensor(train_x, dtype=torch.float32)
+  #train_y = torch.tensor(train_y, dtype=torch.float32)
+
+  return train_x, train_y, test_x, test_y
+
+import torch
+import torch.nn as nn
+
+def model_building(train_x, train_y, test_x):
+  model = nn.Linear(30, 1)
+
+  learning_rate = 0.001
+  n_iters = 100
+
+  loss = nn.L1Loss()
+  optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+  max_grad_norm = 1.0
+
+  for epoch in range(n_iters):
+    # perdiction = forward pass
+    y_pred = model(torch.from_numpy(train_x).float())
+    score_loss = loss(train_y, y_pred)
+    score_loss.backward()
+    nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)   #梯度裁剪
+    optimizer.step()
+    optimizer.zero_grad()
+
+    if epoch % 1 == 0:
+        [w, b] = model.parameters()
+        print(f'epoch {epoch + 1}:  w = {w[0][0]:.3f}, loss = {score_loss:.8f}')
+    
+  # testing
+  for_pred = model(torch.from_numpy(test_x).float())
+
+  print(f'Prediction after training，the testing score vs real score(1095): =', for_pred[-1])
+
+package = data_collecting('2330.TW')
+
+train_x = package[0]
+train_y = package[1]
+test_x = package[2]
+test_y = package[3]
+
+model_building(train_x, train_y, test_x)
