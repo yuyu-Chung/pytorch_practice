@@ -1,0 +1,109 @@
+# pytorch 正式deep learning 完整練習作品
+# 運用 sklearn 模組 datasets 裡的 breast canser 資料集做練習，其實本來預設的不是他，不過colab幫我自動跳出他，覺得還不錯就用它來做練習。
+# https://www.kaggle.com/code/hkhamnakhalid/breast-cancer
+# 第一步，先load data 觀察data的整體狀況，然後把它切分成訓練集及測試集，直接用sklearn的模組train_test_split，對他比較熟悉，pytorch的切割模組以後再來練習，最後再把它轉成tensor資料型態，然後練習建成pytorch提供的模組 Dataset and DataLoader，資料準備就緒。
+# 第二步建立model，用pytorch模組，這次正式練習建立深度學習model，先設立簡單的三層，然後設定loss function and optimizer function。
+# 第三步 train model，分成正式模型訓練及test驗證，哈哈這麼乾淨的資料及訓練跟驗證結果94% and 92%，覺得很滿意，這次作品做完覺得真棒\^O^/
+
+import pandas as pd
+import numpy as np
+
+import torch
+import torch.nn as nn
+from torch.utils.data import Dataset, DataLoader
+
+from sklearn import datasets 
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# data collecting
+bc = datasets.load_breast_cancer()
+X, y = bc.data, bc.target
+n_samples, n_features = X.shape
+print(n_samples, n_features)  # 569, 30
+
+# data spliting
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=1234)
+
+# data observeing
+bc.feature_names
+bc.target_names
+bc.target
+bc['DESCR']
+df = pd.DataFrame(bc.data, columns=bc.feature_names)
+df['result'] = bc.target
+df.head()
+df.head()
+df.describe()
+print(type(X_train))
+
+# data type fransform
+X_train = torch.tensor(X_train,dtype=torch.float32)
+y_train = torch.tensor(y_train,dtype=torch.long)
+X_test = torch.tensor(X_test,dtype=torch.float32)
+y_test = torch.tensor(y_test,dtype=torch.long)
+
+# dataset
+class dataset(Dataset):
+    def __init__(self,x,y):
+        self.x = x
+        self.y = y
+        self.n_samples = x.shape[0]
+    def __getitem__(self,index):
+        return self.x[index],self.y[index]
+    def __len__(self):
+        return self.n_samples
+train_set = dataset(X_train,y_train)
+test_set = dataset(X_test,y_test) 
+
+# data loader 
+train_loader = DataLoader(dataset=train_set,batch_size=10,shuffle=True)
+test_loader = DataLoader(dataset=test_set,batch_size=10,shuffle=True) 
+
+# model building         
+class Model(nn.Module):
+    def __init__(self):
+        super(Model,self).__init__()
+        self.net = nn.Sequential(
+            nn.Linear(30,10),
+            nn.ReLU(),
+            nn.Linear(10,5),
+            nn.ReLU(),
+            nn.Linear(5,2))
+    def forward(self,x):
+        return self.net(x)
+model = Model()
+
+# loss function and optimizer
+criterion = nn.CrossEntropyLoss()
+optimizer = torch.optim.Adam(model.parameters(),lr=0.0001)
+
+# model training
+epochs = 100
+n_batch = len(train_loader)
+for j in range(epochs):
+    for i,(samples,labels) in enumerate(train_loader):
+        pre = model(samples)
+        labels=labels.view(-1)
+        loss = criterion(pre,labels)
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        print(f"epoch = {j+1}/{epochs} batch = {i+1}/{n_batch} loss = {loss:.4f}",end=' ')
+        with torch.no_grad():
+            pre = model(X_train)
+            _,pre = torch.max(pre,1)
+            n_sample = len(X_train)
+            n_correct = (y_train.view(-1)== pre ).sum()
+            print(f"train_acc = {n_correct/n_sample:.4f}")   #94.5%
+
+# model testing
+with torch.no_grad():
+    pre = model(X_test)
+    _,pre = torch.max(pre,1)
+    n_sample = len(X_test)
+    n_correct = (y_test.view(-1)== pre ).sum()
+    print(f"test_acc = {n_correct/n_sample:.4f}")    # 92%
